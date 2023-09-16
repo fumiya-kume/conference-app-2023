@@ -1,9 +1,9 @@
 pluginManagement {
     includeBuild("build-logic")
     repositories {
-        gradlePluginPortal()
         google()
         mavenCentral()
+        gradlePluginPortal()
     }
 }
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
@@ -12,7 +12,6 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-
     }
 }
 rootProject.name = "conference-app-2023"
@@ -25,7 +24,7 @@ include(
     ":feature:sponsors",
     ":feature:floor-map",
     ":feature:contributors",
-    ":feature:stamps",
+    ":feature:achievements",
     ":feature:staff",
     ":core:designsystem",
     ":core:data",

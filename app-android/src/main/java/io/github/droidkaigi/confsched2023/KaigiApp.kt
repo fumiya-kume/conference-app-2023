@@ -6,20 +6,20 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.provider.CalendarContract
 import androidx.annotation.RequiresApi
 import androidx.browser.customtabs.CustomTabsIntent
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.net.toUri
+import androidx.core.os.bundleOf
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
@@ -27,12 +27,15 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.window.layout.DisplayFeature
-import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import co.touchlab.kermit.Logger
+import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
 import io.github.droidkaigi.confsched2023.about.aboutScreenRoute
 import io.github.droidkaigi.confsched2023.about.navigateAboutScreen
 import io.github.droidkaigi.confsched2023.about.nestedAboutScreen
+import io.github.droidkaigi.confsched2023.achievements.achievementsScreenRoute
+import io.github.droidkaigi.confsched2023.achievements.navigateAchievementsScreen
+import io.github.droidkaigi.confsched2023.achievements.nestedAchievementsScreen
 import io.github.droidkaigi.confsched2023.contributors.ContributorsScreen
-import io.github.droidkaigi.confsched2023.contributors.ContributorsViewModel
 import io.github.droidkaigi.confsched2023.contributors.contributorsScreenRoute
 import io.github.droidkaigi.confsched2023.designsystem.theme.KaigiTheme
 import io.github.droidkaigi.confsched2023.floormap.floorMapScreenRoute
@@ -41,8 +44,7 @@ import io.github.droidkaigi.confsched2023.floormap.nestedFloorMapScreen
 import io.github.droidkaigi.confsched2023.main.MainNestedGraphStateHolder
 import io.github.droidkaigi.confsched2023.main.MainScreenTab
 import io.github.droidkaigi.confsched2023.main.MainScreenTab.About
-import io.github.droidkaigi.confsched2023.main.MainScreenTab.Badges
-import io.github.droidkaigi.confsched2023.main.MainScreenTab.Contributor
+import io.github.droidkaigi.confsched2023.main.MainScreenTab.Achievements
 import io.github.droidkaigi.confsched2023.main.MainScreenTab.FloorMap
 import io.github.droidkaigi.confsched2023.main.MainScreenTab.Timetable
 import io.github.droidkaigi.confsched2023.main.mainScreen
@@ -56,6 +58,9 @@ import io.github.droidkaigi.confsched2023.model.AboutItem.Sponsors
 import io.github.droidkaigi.confsched2023.model.AboutItem.Staff
 import io.github.droidkaigi.confsched2023.model.AboutItem.X
 import io.github.droidkaigi.confsched2023.model.AboutItem.YouTube
+import io.github.droidkaigi.confsched2023.model.Lang.JAPANESE
+import io.github.droidkaigi.confsched2023.model.TimetableItem
+import io.github.droidkaigi.confsched2023.model.defaultLang
 import io.github.droidkaigi.confsched2023.sessions.navigateSearchScreen
 import io.github.droidkaigi.confsched2023.sessions.navigateTimetableScreen
 import io.github.droidkaigi.confsched2023.sessions.navigateToBookmarkScreen
@@ -64,13 +69,12 @@ import io.github.droidkaigi.confsched2023.sessions.nestedSessionScreens
 import io.github.droidkaigi.confsched2023.sessions.searchScreen
 import io.github.droidkaigi.confsched2023.sessions.sessionScreens
 import io.github.droidkaigi.confsched2023.sessions.timetableScreenRoute
+import io.github.droidkaigi.confsched2023.share.ShareNavigator
 import io.github.droidkaigi.confsched2023.sponsors.navigateSponsorsScreen
 import io.github.droidkaigi.confsched2023.sponsors.sponsorsScreen
 import io.github.droidkaigi.confsched2023.staff.navigateStaffScreen
 import io.github.droidkaigi.confsched2023.staff.staffScreen
-import io.github.droidkaigi.confsched2023.stamps.navigateStampsScreen
-import io.github.droidkaigi.confsched2023.stamps.nestedStampsScreen
-import io.github.droidkaigi.confsched2023.stamps.stampsScreenRoute
+import io.github.droidkaigi.confsched2023.ui.handleOnClickIfNotNavigating
 import kotlinx.collections.immutable.PersistentList
 
 @Composable
@@ -80,14 +84,6 @@ fun KaigiApp(
     modifier: Modifier = Modifier,
 ) {
     KaigiTheme {
-        val systemUiController = rememberSystemUiController()
-        val useDarkIcons = !isSystemInDarkTheme()
-
-        DisposableEffect(systemUiController, useDarkIcons) {
-            systemUiController.setSystemBarsColor(Color.Transparent, useDarkIcons)
-            onDispose {}
-        }
-
         Surface(
             modifier = modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background,
@@ -110,42 +106,39 @@ private fun KaigiNavHost(
     NavHostWithSharedAxisX(navController = navController, startDestination = mainScreenRoute) {
         mainScreen(windowSize, displayFeatures, navController, externalNavController)
         sessionScreens(
-            onNavigationIconClick = {
-                navController.popBackStack()
-            },
-            onTimetableItemClick = { timetableItem ->
-                navController.navigateToTimetableItemDetailScreen(
-                    timetableItem.id,
-                )
-            },
+            onNavigationIconClick = navController::popBackStack,
+            onTimetableItemClick = navController::navigateToTimetableItemDetailScreen,
+            onNavigateToBookmarkScreenRequested = navController::navigateToBookmarkScreen,
             onLinkClick = externalNavController::navigate,
+            onCalendarRegistrationClick = externalNavController::navigateToCalendarRegistration,
+            onShareClick = externalNavController::onShareClick,
         )
         searchScreen(
-            onNavigationIconClick = {
-                navController.popBackStack()
-            },
-            onTimetableItemClick = { timetableItem ->
-                navController.navigateToTimetableItemDetailScreen(
-                    timetableItem.id,
-                )
-            },
+            onNavigationIconClick = navController::popBackStack,
+            onTimetableItemClick = navController::navigateToTimetableItemDetailScreen,
         )
         sponsorsScreen(
-            onNavigationIconClick = {
-                navController.popBackStack()
-            },
-            onSponsorClick = { sponsor ->
-                TODO()
-            },
+            onNavigationIconClick = navController::popBackStack,
+            onSponsorClick = externalNavController::navigate,
         )
         staffScreen(
-            onBackClick = {
-                navController.popBackStack()
-            },
-            onStaffClick = {
-                externalNavController.navigate(it)
-            },
+            onBackClick = navController::popBackStack,
+            onStaffClick = externalNavController::navigate,
         )
+        // For KMP, we are not using navigation abstraction for contributors screen
+        composable(contributorsScreenRoute) {
+            val lifecycleOwner = LocalLifecycleOwner.current
+            ContributorsScreen(
+                viewModel = hiltViewModel(),
+                onNavigationIconClick = {
+                    handleOnClickIfNotNavigating(
+                        lifecycleOwner,
+                        navController::popBackStack,
+                    )
+                },
+                onContributorItemClick = externalNavController::navigate,
+            )
+        }
     }
 }
 
@@ -159,55 +152,47 @@ private fun NavGraphBuilder.mainScreen(
         windowSize = windowSize,
         displayFeatures = displayFeatures,
         mainNestedGraphStateHolder = KaigiAppMainNestedGraphStateHolder(),
-        mainNestedGraph = { mainNestedNavController, _ ->
+        mainNestedGraph = { mainNestedNavController, contentPadding ->
             nestedSessionScreens(
                 modifier = Modifier,
-                onSearchClick = {
-                    navController.navigateSearchScreen()
-                },
-                onTimetableItemClick = { timetableItem ->
-                    navController.navigateToTimetableItemDetailScreen(
-                        timetableItem.id,
-                    )
-                },
-                onBookmarkIconClick = {
-                    navController.navigateToBookmarkScreen()
-                },
+                onSearchClick = navController::navigateSearchScreen,
+                onTimetableItemClick = navController::navigateToTimetableItemDetailScreen,
+                onBookmarkIconClick = navController::navigateToBookmarkScreen,
+                contentPadding = contentPadding,
             )
             nestedAboutScreen(
                 onAboutItemClick = { aboutItem ->
+                    val portalBaseUrl = if (defaultLang() == JAPANESE) {
+                        "https://portal.droidkaigi.jp"
+                    } else {
+                        "https://portal.droidkaigi.jp/en"
+                    }
                     when (aboutItem) {
                         Sponsors -> navController.navigateSponsorsScreen()
-                        CodeOfConduct -> externalNavController.navigate(url = "https://portal.droidkaigi.jp/about/code-of-conduct")
-                        Contributors -> mainNestedNavController.navigate(contributorsScreenRoute)
-                        License -> TODO()
+                        CodeOfConduct -> { externalNavController.navigate(url = "$portalBaseUrl/about/code-of-conduct") }
+                        Contributors -> navController.navigate(contributorsScreenRoute)
+                        License -> externalNavController.navigateToLicenseScreen()
                         Medium -> externalNavController.navigate(url = "https://medium.com/droidkaigi")
-                        PrivacyPolicy -> externalNavController.navigate(url = "https://portal.droidkaigi.jp/about/privacy")
+                        PrivacyPolicy -> {
+                            externalNavController.navigate(url = "$portalBaseUrl/about/privacy")
+                        }
+
                         Staff -> navController.navigateStaffScreen()
                         X -> externalNavController.navigate(url = "https://twitter.com/DroidKaigi")
                         YouTube -> externalNavController.navigate(url = "https://www.youtube.com/c/DroidKaigi")
                     }
                 },
                 onLinkClick = externalNavController::navigate,
+                contentPadding = contentPadding,
             )
             nestedFloorMapScreen(
+                windowSize = windowSize,
                 onSideEventClick = externalNavController::navigate,
+                contentPadding = contentPadding,
             )
-            nestedStampsScreen(
-                onStampsClick = {
-                    TODO()
-                },
+            nestedAchievementsScreen(
+                contentPadding = contentPadding,
             )
-            // For KMP, we are not using navigation abstraction for contributors screen
-            composable(contributorsScreenRoute) {
-                ContributorsScreen(
-                    viewModel = hiltViewModel<ContributorsViewModel>(),
-                    onNavigationIconClick = {
-                        navController.popBackStack()
-                    },
-                    onContributorItemClick = externalNavController::navigate,
-                )
-            }
         },
     )
 }
@@ -218,10 +203,9 @@ class KaigiAppMainNestedGraphStateHolder : MainNestedGraphStateHolder {
     override fun routeToTab(route: String): MainScreenTab? {
         return when (route) {
             timetableScreenRoute -> Timetable
-            contributorsScreenRoute -> Contributor
             aboutScreenRoute -> About
             floorMapScreenRoute -> FloorMap
-            stampsScreenRoute -> Badges
+            achievementsScreenRoute -> Achievements
             else -> null
         }
     }
@@ -234,12 +218,7 @@ class KaigiAppMainNestedGraphStateHolder : MainNestedGraphStateHolder {
             Timetable -> mainNestedNavController.navigateTimetableScreen()
             About -> mainNestedNavController.navigateAboutScreen()
             FloorMap -> mainNestedNavController.navigateFloorMapScreen()
-            Contributor -> mainNestedNavController.navigate(contributorsScreenRoute) {
-                launchSingleTop = true
-                restoreState = true
-            }
-
-            Badges -> mainNestedNavController.navigateStampsScreen()
+            Achievements -> mainNestedNavController.navigateAchievementsScreen()
         }
     }
 }
@@ -247,13 +226,19 @@ class KaigiAppMainNestedGraphStateHolder : MainNestedGraphStateHolder {
 @Composable
 private fun rememberExternalNavController(): ExternalNavController {
     val context = LocalContext.current
+    val shareNavigator = ShareNavigator(context)
+
     return remember(context) {
-        ExternalNavController(context = context)
+        ExternalNavController(
+            context = context,
+            shareNavigator = shareNavigator,
+        )
     }
 }
 
 private class ExternalNavController(
     private val context: Context,
+    private val shareNavigator: ShareNavigator,
 ) {
 
     fun navigate(url: String) {
@@ -268,6 +253,44 @@ private class ExternalNavController(
         }
     }
 
+    /**
+     * Navigate to Calendar Registration
+     * @param timeTableItem カレンダー登録に必要なタイムラインアイテムの情報
+     */
+    fun navigateToCalendarRegistration(timeTableItem: TimetableItem) {
+        val calendarIntent = Intent(Intent.ACTION_INSERT).apply {
+            data = CalendarContract.Events.CONTENT_URI
+            putExtras(
+                bundleOf(
+                    CalendarContract.EXTRA_EVENT_BEGIN_TIME to timeTableItem.startsAt.toEpochMilliseconds(),
+                    CalendarContract.EXTRA_EVENT_END_TIME to timeTableItem.endsAt.toEpochMilliseconds(),
+                    CalendarContract.Events.TITLE to "[${timeTableItem.room.name.currentLangTitle}] ${timeTableItem.title.currentLangTitle}",
+                    CalendarContract.Events.DESCRIPTION to timeTableItem.url,
+                    CalendarContract.Events.EVENT_LOCATION to timeTableItem.room.name.currentLangTitle,
+                ),
+            )
+        }
+
+        runCatching {
+            context.startActivity(calendarIntent)
+        }.onFailure {
+            Logger.e("Fail startActivity in navigateToCalendarRegistration", it)
+        }
+    }
+
+    fun navigateToLicenseScreen() {
+        context.startActivity(Intent(context, OssLicensesMenuActivity::class.java))
+    }
+
+    fun onShareClick(timeTableItem: TimetableItem) {
+        shareNavigator.share(
+            "[${timeTableItem.room.name.currentLangTitle}] ${timeTableItem.startsTimeString} - ${timeTableItem.endsTimeString}\n" +
+                "${timeTableItem.title.currentLangTitle}\n" +
+                timeTableItem.url,
+        )
+    }
+
+    @Suppress("SwallowedException")
     @RequiresApi(Build.VERSION_CODES.R)
     private fun navigateToNativeAppApi30(context: Context, uri: Uri): Boolean {
         val nativeAppIntent = Intent(Intent.ACTION_VIEW, uri)

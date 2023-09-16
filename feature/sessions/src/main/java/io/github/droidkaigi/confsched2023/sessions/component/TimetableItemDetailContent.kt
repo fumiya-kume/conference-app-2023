@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,6 +46,8 @@ import io.github.droidkaigi.confsched2023.designsystem.preview.MultiLanguagePrev
 import io.github.droidkaigi.confsched2023.designsystem.preview.MultiThemePreviews
 import io.github.droidkaigi.confsched2023.designsystem.theme.KaigiTheme
 import io.github.droidkaigi.confsched2023.designsystem.theme.md_theme_light_outline
+import io.github.droidkaigi.confsched2023.model.Lang
+import io.github.droidkaigi.confsched2023.model.TimetableAsset
 import io.github.droidkaigi.confsched2023.model.TimetableItem
 import io.github.droidkaigi.confsched2023.model.TimetableItem.Session
 import io.github.droidkaigi.confsched2023.model.TimetableItem.Special
@@ -55,29 +58,52 @@ import io.github.droidkaigi.confsched2023.ui.previewOverride
 import io.github.droidkaigi.confsched2023.ui.rememberAsyncImagePainter
 import kotlinx.collections.immutable.PersistentList
 
+const val TimetableItemDetailReadMoreButtonTestTag = "TimetableItemDetailReadMoreButtonTestTag"
+
 @Composable
 fun TimetableItemDetailContent(
     uiState: TimetableItem,
+    selectedLanguage: Lang?,
     modifier: Modifier = Modifier,
     onLinkClick: (url: String) -> Unit,
 ) {
     Column(modifier = modifier) {
         when (uiState) {
             is Session -> {
+                val description = when (selectedLanguage) {
+                    Lang.JAPANESE -> uiState.description.jaTitle
+                    Lang.ENGLISH -> uiState.description.enTitle
+                    Lang.MIXED,
+                    null,
+                    -> ""
+                }
                 DescriptionSection(
-                    description = uiState.description,
+                    description = description,
                     onLinkClick = onLinkClick,
                 )
                 TargetAudienceSection(targetAudienceString = uiState.targetAudience)
                 SpeakerSection(speakers = uiState.speakers)
-                ArchiveSection(
-                    onViewDocumentClick = {},
-                    onWatchVideoClick = {},
-                )
+                if (uiState.asset.isAvailable) {
+                    ArchiveSection(
+                        timeTableAsset = uiState.asset,
+                        onViewDocumentClick = onLinkClick,
+                        onWatchVideoClick = onLinkClick,
+                    )
+                }
             }
 
             is Special -> {
-                // do nothing
+                val description = when (selectedLanguage) {
+                    Lang.JAPANESE -> uiState.description.jaTitle
+                    Lang.ENGLISH -> uiState.description.enTitle
+                    Lang.MIXED -> uiState.description.jaTitle
+                    null,
+                    -> ""
+                }
+                DescriptionSection(
+                    description = description,
+                    onLinkClick = onLinkClick,
+                )
             }
         }
     }
@@ -102,11 +128,14 @@ private fun DescriptionSection(
                 overflow = TextOverflow.Ellipsis,
                 maxLines = if (isExpanded) Int.MAX_VALUE else 5,
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp),
+                onOverflow = { isExpanded = it.not() },
             )
             if (!isExpanded) {
                 ReadMoreOutlinedButton(
                     onClick = { isExpanded = true },
-                    modifier = Modifier.padding(top = 16.dp, start = 16.dp, end = 16.dp),
+                    modifier = Modifier
+                        .testTag(TimetableItemDetailReadMoreButtonTestTag)
+                        .padding(top = 16.dp, start = 16.dp, end = 16.dp),
                 )
             }
             BorderLine(modifier = Modifier.padding(top = 24.dp))
@@ -189,8 +218,9 @@ private fun SpeakerSection(
 
 @Composable
 private fun ArchiveSection(
-    onViewDocumentClick: () -> Unit,
-    onWatchVideoClick: () -> Unit,
+    timeTableAsset: TimetableAsset,
+    onViewDocumentClick: (slideUrl: String) -> Unit,
+    onWatchVideoClick: (videoUrl: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.padding(vertical = 24.dp, horizontal = 16.dp)) {
@@ -204,47 +234,51 @@ private fun ArchiveSection(
                 .fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(space = 8.dp),
         ) {
-            ArchiveSectionIconButton(
-                icon = {
-                    Icon(
-                        imageVector = Icons.Outlined.Description,
-                        contentDescription = null,
-                        modifier = Modifier.size(width = 18.dp, height = 18.dp),
-                    )
-                },
-                label = {
-                    Text(
-                        text = SessionsStrings.ViewDocument.asString(),
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Center,
-                    )
-                },
-                onClick = { onViewDocumentClick() },
-                modifier = Modifier
-                    .width(0.dp)
-                    .weight(1F),
-            )
+            timeTableAsset.slideUrl?.let { slideUrl ->
+                ArchiveSectionIconButton(
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Description,
+                            contentDescription = null,
+                            modifier = Modifier.size(width = 18.dp, height = 18.dp),
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = SessionsStrings.ViewDocument.asString(),
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                        )
+                    },
+                    onClick = { onViewDocumentClick(slideUrl) },
+                    modifier = Modifier
+                        .width(0.dp)
+                        .weight(1F),
+                )
+            }
 
-            ArchiveSectionIconButton(
-                icon = {
-                    Icon(
-                        imageVector = Icons.Outlined.PlayCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(width = 18.dp, height = 18.dp),
-                    )
-                },
-                label = {
-                    Text(
-                        text = SessionsStrings.WatchVideo.asString(),
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Center,
-                    )
-                },
-                onClick = { onWatchVideoClick() },
-                modifier = Modifier
-                    .width(0.dp)
-                    .weight(1F),
-            )
+            timeTableAsset.videoUrl?.let { videoUrl ->
+                ArchiveSectionIconButton(
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Outlined.PlayCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(width = 18.dp, height = 18.dp),
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = SessionsStrings.WatchVideo.asString(),
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                        )
+                    },
+                    onClick = { onWatchVideoClick(videoUrl) },
+                    modifier = Modifier
+                        .width(0.dp)
+                        .weight(1F),
+                )
+            }
         }
         Spacer(modifier = Modifier.height(24.dp))
     }
@@ -329,7 +363,22 @@ fun DescriptionSectionPreview() {
     KaigiTheme {
         Surface {
             DescriptionSection(
-                description = Session.fake().description,
+                description = Session.fake().description.currentLangTitle,
+                onLinkClick = {},
+            )
+        }
+    }
+}
+
+@MultiThemePreviews
+@MultiLanguagePreviews
+@Composable
+fun TimetableItemDetailContentPreview() {
+    KaigiTheme {
+        Surface {
+            TimetableItemDetailContent(
+                uiState = Session.fake(),
+                selectedLanguage = Lang.JAPANESE,
                 onLinkClick = {},
             )
         }

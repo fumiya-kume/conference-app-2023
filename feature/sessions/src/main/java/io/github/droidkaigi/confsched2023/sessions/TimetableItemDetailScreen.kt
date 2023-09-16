@@ -1,17 +1,19 @@
 package io.github.droidkaigi.confsched2023.sessions
 
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,17 +25,18 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import io.github.droidkaigi.confsched2023.designsystem.component.LoadingText
 import io.github.droidkaigi.confsched2023.designsystem.preview.MultiLanguagePreviews
 import io.github.droidkaigi.confsched2023.designsystem.preview.MultiThemePreviews
 import io.github.droidkaigi.confsched2023.designsystem.theme.KaigiTheme
+import io.github.droidkaigi.confsched2023.model.Lang
 import io.github.droidkaigi.confsched2023.model.TimetableItem
 import io.github.droidkaigi.confsched2023.model.TimetableItem.Session
-import io.github.droidkaigi.confsched2023.model.TimetableItemId
 import io.github.droidkaigi.confsched2023.model.fake
 import io.github.droidkaigi.confsched2023.sessions.TimetableItemDetailScreenUiState.Loaded
+import io.github.droidkaigi.confsched2023.sessions.TimetableItemDetailScreenUiState.Loading
 import io.github.droidkaigi.confsched2023.sessions.component.TimetableItemDetailBottomAppBar
 import io.github.droidkaigi.confsched2023.sessions.component.TimetableItemDetailScreenTopAppBar
-import io.github.droidkaigi.confsched2023.sessions.component.TimetableLoadingContent
 import io.github.droidkaigi.confsched2023.sessions.section.TimetableItemDetail
 import io.github.droidkaigi.confsched2023.sessions.section.TimetableItemDetailSectionUiState
 import io.github.droidkaigi.confsched2023.ui.SnackbarMessageEffect
@@ -45,12 +48,18 @@ const val timetableItemDetailScreenRoute =
 fun NavGraphBuilder.sessionScreens(
     onNavigationIconClick: () -> Unit,
     onTimetableItemClick: (TimetableItem) -> Unit,
+    onNavigateToBookmarkScreenRequested: () -> Unit,
     onLinkClick: (url: String) -> Unit,
+    onCalendarRegistrationClick: (TimetableItem) -> Unit,
+    onShareClick: (TimetableItem) -> Unit,
 ) {
     composable(timetableItemDetailScreenRoute) {
         TimetableItemDetailScreen(
             onNavigationIconClick = onNavigationIconClick,
             onLinkClick = onLinkClick,
+            onCalendarRegistrationClick = onCalendarRegistrationClick,
+            onNavigateToBookmarkScreenRequested = onNavigateToBookmarkScreenRequested,
+            onShareClick = onShareClick,
         )
     }
     composable(bookmarkScreenRoute) {
@@ -62,12 +71,12 @@ fun NavGraphBuilder.sessionScreens(
 }
 
 fun NavController.navigateToTimetableItemDetailScreen(
-    timetableItemId: TimetableItemId,
+    timetableItem: TimetableItem,
 ) {
     navigate(
         timetableItemDetailScreenRoute.replace(
             "{$timetableItemDetailScreenRouteItemIdParameterName}",
-            timetableItemId.value,
+            timetableItem.id.value,
         ),
     )
 }
@@ -76,6 +85,9 @@ fun NavController.navigateToTimetableItemDetailScreen(
 fun TimetableItemDetailScreen(
     onNavigationIconClick: () -> Unit,
     onLinkClick: (url: String) -> Unit,
+    onCalendarRegistrationClick: (TimetableItem) -> Unit,
+    onNavigateToBookmarkScreenRequested: () -> Unit,
+    onShareClick: (TimetableItem) -> Unit,
     viewModel: TimetableItemDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -86,22 +98,43 @@ fun TimetableItemDetailScreen(
         userMessageStateHolder = viewModel.userMessageStateHolder,
     )
 
+    LaunchedEffect(uiState.shouldNavigateToBookmarkList) {
+        if (uiState.shouldNavigateToBookmarkList) {
+            onNavigateToBookmarkScreenRequested()
+            viewModel.onViewBookmarkListRequestCompleted()
+        }
+    }
+
     TimetableItemDetailScreen(
         uiState = uiState,
         onNavigationIconClick = onNavigationIconClick,
         onBookmarkClick = viewModel::onBookmarkClick,
         onLinkClick = onLinkClick,
+        onCalendarRegistrationClick = onCalendarRegistrationClick,
+        onShareClick = onShareClick,
+        onSelectedLanguage = viewModel::onSelectDescriptionLanguage,
         snackbarHostState = snackbarHostState,
     )
 }
 
-sealed class TimetableItemDetailScreenUiState() {
+sealed class TimetableItemDetailScreenUiState {
     data object Loading : TimetableItemDetailScreenUiState()
     data class Loaded(
         val timetableItem: TimetableItem,
         val timetableItemDetailSectionUiState: TimetableItemDetailSectionUiState,
         val isBookmarked: Boolean,
+        val isLangSelectable: Boolean,
+        val viewBookmarkListRequestState: ViewBookmarkListRequestState,
+        val currentLang: Lang?,
     ) : TimetableItemDetailScreenUiState()
+
+    val shouldNavigateToBookmarkList: Boolean
+        get() = this is Loaded && viewBookmarkListRequestState is ViewBookmarkListRequestState.Requested
+}
+
+sealed class ViewBookmarkListRequestState {
+    data object NotRequested : ViewBookmarkListRequestState()
+    data object Requested : ViewBookmarkListRequestState()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -111,52 +144,61 @@ private fun TimetableItemDetailScreen(
     onNavigationIconClick: () -> Unit,
     onBookmarkClick: (TimetableItem) -> Unit,
     onLinkClick: (url: String) -> Unit,
+    onCalendarRegistrationClick: (TimetableItem) -> Unit,
+    onShareClick: (TimetableItem) -> Unit,
+    onSelectedLanguage: (Lang) -> Unit,
     snackbarHostState: SnackbarHostState,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            if (uiState is TimetableItemDetailScreenUiState.Loaded) {
+            if (uiState is Loaded) {
                 TimetableItemDetailScreenTopAppBar(
                     title = uiState.timetableItem.title,
+                    isLangSelectable = uiState.isLangSelectable,
                     onNavigationIconClick = onNavigationIconClick,
+                    onSelectedLanguage = onSelectedLanguage,
                     scrollBehavior = scrollBehavior,
                 )
             }
         },
         bottomBar = {
-            if (uiState is TimetableItemDetailScreenUiState.Loaded) {
+            if (uiState is Loaded) {
                 TimetableItemDetailBottomAppBar(
                     timetableItem = uiState.timetableItem,
                     isBookmarked = uiState.isBookmarked,
                     onBookmarkClick = onBookmarkClick,
+                    onCalendarRegistrationClick = onCalendarRegistrationClick,
+                    onShareClick = onShareClick,
                 )
             }
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { innerPadding ->
-        AnimatedContent(
-            targetState = uiState,
-            transitionSpec = { fadeIn().togetherWith(fadeOut()) },
-            label = "TimetableItemDetailScreen",
-        ) {
-            when (it) {
-                TimetableItemDetailScreenUiState.Loading -> {
-                    TimetableLoadingContent(
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+        if (uiState is Loaded) {
+            TimetableItemDetail(
+                modifier = Modifier.fillMaxSize(),
+                uiState = uiState.timetableItemDetailSectionUiState,
+                selectedLanguage = uiState.currentLang,
+                onLinkClick = onLinkClick,
+                contentPadding = innerPadding,
+            )
+        }
 
-                is TimetableItemDetailScreenUiState.Loaded -> {
-                    TimetableItemDetail(
-                        modifier = Modifier.fillMaxSize(),
-                        uiState = it.timetableItemDetailSectionUiState,
-                        onLinkClick = onLinkClick,
-                        contentPadding = innerPadding,
-                    )
-                }
-            }
+        AnimatedVisibility(
+            modifier = Modifier.fillMaxSize(),
+            visible = (uiState is Loading),
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            LoadingText(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background),
+            )
         }
     }
 }
@@ -175,12 +217,18 @@ fun TimetableItemDetailScreenPreview() {
                     timetableItem = fakeSession,
                     timetableItemDetailSectionUiState = TimetableItemDetailSectionUiState(fakeSession),
                     isBookmarked = isBookMarked,
+                    isLangSelectable = true,
+                    viewBookmarkListRequestState = ViewBookmarkListRequestState.NotRequested,
+                    currentLang = Lang.JAPANESE,
                 ),
                 onNavigationIconClick = {},
                 onBookmarkClick = {
                     isBookMarked = !isBookMarked
                 },
                 onLinkClick = {},
+                onCalendarRegistrationClick = {},
+                onShareClick = {},
+                onSelectedLanguage = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }

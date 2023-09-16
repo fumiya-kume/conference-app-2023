@@ -1,34 +1,36 @@
+import Model
 import SwiftUI
 import Theme
 
-private let formatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .none
-    formatter.timeStyle = .short
-    return formatter
-}()
-
 struct SessionTimeView: View {
-    var startsAt: Date
-    var endsAt: Date
+    var startsTimeString: String
+    var endsTimeString: String
 
     var body: some View {
-        VStack(spacing: 4) {
-            Text(formatter.string(from: startsAt))
+        VStack(spacing: SpacingTokens.xxs) {
+            Text(startsTimeString)
+                .textStyle(TypographyTokens.titleMedium)
                 .foregroundStyle(AssetColors.Surface.onSurface.swiftUIColor)
-                .font(Font(UIFont.systemFont(ofSize: 16, weight: .bold)))
                 .frame(height: 24)
             Rectangle()
                 .foregroundColor(AssetColors.Outline.outlineVariant.swiftUIColor)
                 .frame(width: 2, height: 8)
-            Text(formatter.string(from: endsAt))
+            Text(endsTimeString)
+                .textStyle(TypographyTokens.titleMedium)
                 .foregroundStyle(AssetColors.Secondary.secondary.swiftUIColor)
-                .font(Font(UIFont.systemFont(ofSize: 16, weight: .bold)))
                 .frame(height: 24)
         }
     }
 }
 
- #Preview {
-     SessionTimeView(startsAt: .distantPast, endsAt: .distantFuture)
- }
+#if DEBUG
+import shared
+
+#Preview {
+    SessionTimeView(
+        startsTimeString: Timetable.companion.fake().contents.first!.timetableItem.startsTimeString,
+        endsTimeString: Timetable.companion.fake().contents.first!.timetableItem.endsTimeString
+    )
+}
+
+#endif

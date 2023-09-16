@@ -1,16 +1,12 @@
 package io.github.droidkaigi.confsched2023.sessions
 
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import io.github.droidkaigi.confsched2023.model.TimetableItem
@@ -32,14 +28,16 @@ data class BookmarkScreenUiState(
 fun BookmarkScreen(
     onBackPressClick: () -> Unit,
     onTimetableItemClick: (TimetableItem) -> Unit,
-    viewModel: BookmarkScreenViewModel = hiltViewModel<BookmarkScreenViewModel>(),
+    viewModel: BookmarkScreenViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     BookmarkScreen(
         uiState = uiState,
         onBackPressClick = onBackPressClick,
         onTimetableItemClick = onTimetableItemClick,
-        onBookmarkClick = viewModel::updateBookmark,
+        onBookmarkClick = { timetableItem, _ ->
+            viewModel.onBookmarkClick(timetableItem)
+        },
         onAllFilterChipClick = viewModel::onAllFilterChipClick,
         onDayFirstChipClick = viewModel::onDayFirstChipClick,
         onDaySecondChipClick = viewModel::onDaySecondChipClick,
@@ -54,7 +52,7 @@ private fun BookmarkScreen(
     uiState: BookmarkScreenUiState,
     onBackPressClick: () -> Unit,
     onTimetableItemClick: (TimetableItem) -> Unit,
-    onBookmarkClick: (TimetableItem) -> Unit,
+    onBookmarkClick: (TimetableItem, Boolean) -> Unit,
     onAllFilterChipClick: () -> Unit,
     onDayFirstChipClick: () -> Unit,
     onDaySecondChipClick: () -> Unit,
@@ -69,11 +67,9 @@ private fun BookmarkScreen(
                 onBackPressClick = onBackPressClick,
             )
         },
-        containerColor = Color(0xFFF8FAF6),
-        contentWindowInsets = WindowInsets(0.dp),
     ) { padding ->
         BookmarkSheet(
-            modifier = Modifier.padding(padding),
+            modifier = Modifier,
             scrollState = scrollState,
             onTimetableItemClick = onTimetableItemClick,
             onBookmarkClick = onBookmarkClick,
@@ -81,6 +77,7 @@ private fun BookmarkScreen(
             onDayFirstChipClick = onDayFirstChipClick,
             onDaySecondChipClick = onDaySecondChipClick,
             onDayThirdChipClick = onDayThirdChipClick,
+            contentPadding = padding,
             uiState = uiState.contentUiState,
         )
     }

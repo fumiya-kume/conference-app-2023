@@ -1,6 +1,5 @@
 package io.github.droidkaigi.confsched2023.contributors
 
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -13,17 +12,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import io.github.droidkaigi.confsched2023.contributors.component.ContributorListItem
 import io.github.droidkaigi.confsched2023.model.Contributor
+import io.github.droidkaigi.confsched2023.ui.SnackbarMessageEffect
 import kotlinx.collections.immutable.PersistentList
 
 const val contributorsScreenRoute = "contributors"
@@ -34,14 +36,23 @@ data class ContributorsUiState(val contributors: PersistentList<Contributor>)
 @Composable
 fun ContributorsScreen(
     viewModel: ContributorsViewModel,
+    isTopAppBarHidden: Boolean = false,
     onNavigationIconClick: () -> Unit,
-    onContributorItemClick: (url: String) -> Unit
+    onContributorItemClick: (url: String) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    SnackbarMessageEffect(
+        snackbarHostState = snackbarHostState,
+        userMessageStateHolder = viewModel.userMessageStateHolder,
+    )
     ContributorsScreen(
         uiState = uiState,
+        isTopAppBarHidden = isTopAppBarHidden,
+        snackbarHostState = snackbarHostState,
         onBackClick = onNavigationIconClick,
-        onContributorItemClick = onContributorItemClick
+        onContributorItemClick = onContributorItemClick,
     )
 }
 
@@ -49,31 +60,40 @@ fun ContributorsScreen(
 @Composable
 private fun ContributorsScreen(
     uiState: ContributorsUiState,
+    snackbarHostState: SnackbarHostState,
     onBackClick: () -> Unit,
     onContributorItemClick: (url: String) -> Unit,
+    isTopAppBarHidden: Boolean,
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val scrollBehavior =
+        if (!isTopAppBarHidden) {
+            TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+        } else {
+            null
+        }
     Scaffold(
         modifier = Modifier.testTag(ContributorsScreenTestTag),
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
-            LargeTopAppBar(
-                title = {
-                    Text(text = "Contributor")
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = onBackClick,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back", // TODO: transparent
-                        )
-                    }
-                },
-                scrollBehavior = scrollBehavior
-            )
+            if (scrollBehavior != null) {
+                LargeTopAppBar(
+                    title = {
+                        Text(text = "Contributor")
+                    },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = onBackClick,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Back",
+                            )
+                        }
+                    },
+                    scrollBehavior = scrollBehavior
+                )
+            }
         },
-        contentWindowInsets = WindowInsets(0.dp),
     ) { padding ->
         Contributors(
             contributors = uiState.contributors,
@@ -81,7 +101,13 @@ private fun ContributorsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .nestedScroll(scrollBehavior.nestedScrollConnection)
+                .let {
+                    if (scrollBehavior != null) {
+                        it.nestedScroll(scrollBehavior.nestedScrollConnection)
+                    } else {
+                        it
+                    }
+                },
         )
     }
 }
@@ -92,9 +118,8 @@ private fun Contributors(
     onContributorItemClick: (url: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // FIXME: Bottom Inset not implemented
     LazyColumn(
-        modifier = modifier
+        modifier = modifier,
     ) {
         items(contributors) {
             ContributorListItem(

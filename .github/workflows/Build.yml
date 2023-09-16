@@ -7,6 +7,9 @@ on:
     branches:
       - main
   pull_request:
+    paths-ignore:
+      - 'app-ios/**'
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
@@ -23,15 +26,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
 
       - uses: ./.github/actions/setup-java
-
-      - name: Build all build type and flavor permutations
-        uses: gradle/gradle-build-action@243af859f8ca30903d9d7f7936897ca0358ba691 # v2
-        with:
-          gradle-home-cache-cleanup: true
-          arguments: assemble --stacktrace
+      - run: ./gradlew :app-android:assemble --stacktrace
       - name: Upload build outputs (APKs)
         uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         with:

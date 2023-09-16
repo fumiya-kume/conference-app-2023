@@ -1,41 +1,44 @@
+import Dependencies
 import Foundation
+import KMPContainer
 import Model
 import shared
 
 struct TimetableState: ViewModelState {
+    struct LoadedState: Equatable {
+        var timeGroupTimetableItems: [TimetableTimeGroupItems]
+        var bookmarks: Set<TimetableItemId>
+    }
+
     var selectedDay: DroidKaigi2023Day = .day1
-    var timeGroupTimetableItems: LoadingState<[TimetableTimeGroupItems]> = .initial
+    var loadedState: LoadingState<LoadedState> = .initial
 }
 
 @MainActor
 final class TimetableViewModel: ObservableObject {
+    @Dependency(\.sessionsData) var sessionsData
     @Published private(set) var state: TimetableState = .init()
-    private var cachedTimeGroupTimetableItems: [TimetableTimeGroupItems]?
-
-    func load() async {
-        state.timeGroupTimetableItems = .loading
-        do {
-            let timetable = try await Timetable.companion.fake()
-            let timetableTimeGroupItems = timetable.timetableItems.map {
-                    TimetableTimeGroupItems.Duration(startsAt: $0.startsAt, endsAt: $0.endsAt)
-                }
-                .map { duration in
-                    let items = timetable.contents
-                        .filter { itemWithFavorite in
-                            itemWithFavorite.timetableItem.startsAt == duration.startsAt && itemWithFavorite.timetableItem.endsAt == duration.endsAt
-                        }
-                        .sorted {
-                            $0.timetableItem.room.sort < $1.timetableItem.room.sort
-                        }
-                    return TimetableTimeGroupItems(
-                        duration: duration,
-                        items: items
-                    )
-                }
-            cachedTimeGroupTimetableItems = timetableTimeGroupItems
+    private var cachedTimetable: Timetable? {
+        didSet {
             applySelectedDayToState()
-        } catch let error {
-            state.timeGroupTimetableItems = .failed(error)
+        }
+    }
+    private var loadTask: Task<Void, Error>?
+
+    deinit {
+        loadTask?.cancel()
+    }
+
+    func load() {
+        state.loadedState = .loading
+        loadTask = Task.detached { @MainActor in
+            do {
+                for try await timetable in self.sessionsData.timetable() {
+                    self.cachedTimetable = timetable
+                }
+            } catch let error {
+                self.state.loadedState = .failed(error)
+            }
         }
     }
 
@@ -44,14 +47,39 @@ final class TimetableViewModel: ObservableObject {
         applySelectedDayToState()
     }
 
+    func toggleBookmark(_ id: TimetableItemId) {
+        Task.detached {
+            try await self.sessionsData.toggleBookmark(id)
+        }
+    }
+
     private func applySelectedDayToState() {
-        guard let cachedTimeGroupTimetableItems = cachedTimeGroupTimetableItems else {
+        guard let cachedTimetable = cachedTimetable else {
             return
         }
-        state.timeGroupTimetableItems = .loaded(
-            cachedTimeGroupTimetableItems.filter {
-                $0.items.first?.timetableItem.day == state.selectedDay
+        let timetableTimeGroupItems = cachedTimetable.dayTimetable(droidKaigi2023Day: state.selectedDay)
+            .timetableItems
+            .map { item in
+                let items = cachedTimetable.contents
+                    .filter { itemWithFavorite in
+                        itemWithFavorite.timetableItem.startsTimeString == item.startsTimeString && itemWithFavorite.timetableItem.endsTimeString == item.endsTimeString
+                    }
+                    .sorted {
+                        $0.timetableItem.room.name.currentLangTitle < $1.timetableItem.room.name.currentLangTitle
+                    }
+                return TimetableTimeGroupItems(
+                    startsTimeString: items.first?.timetableItem.startsTimeString ?? "",
+                    endsTimeString: items.first?.timetableItem.endsTimeString ?? "",
+                    items: items
+                )
             }
+        var seen: [TimetableTimeGroupItems: Bool] = [:]
+        let distinctedTimetableTimeGroupItems = timetableTimeGroupItems.filter { seen.updateValue(true, forKey: $0) == nil }
+        state.loadedState = .loaded(
+            .init(
+                timeGroupTimetableItems: distinctedTimetableTimeGroupItems,
+                bookmarks: cachedTimetable.bookmarks
+            )
         )
     }
 }

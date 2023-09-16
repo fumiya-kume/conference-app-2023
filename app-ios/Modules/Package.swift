@@ -5,8 +5,10 @@ import PackageDescription
 
 var package = Package(
     name: "Modules",
+    defaultLocalization: "ja",
     platforms: [
         .iOS(.v16),
+        .macOS(.v12),
     ],
     products: [
         .library(name: "Component", targets: ["Component"]),
@@ -17,11 +19,13 @@ var package = Package(
         .library(name: "Navigation", targets: ["Navigation"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-collections.git", from: "1.0.4"),
-        .package(url: "https://github.com/apple/swift-algorithms.git", from: "1.0.0"),
-        .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "0.1.0"),
         .package(url: "https://github.com/realm/SwiftLint", from: "0.52.4"),
         .package(url: "https://github.com/SwiftGen/SwiftGenPlugin", from: "6.6.2"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
+        .package(url: "https://github.com/cybozu/LicenseList", from: "0.2.1"),
+        .package(url: "https://github.com/firebase/firebase-ios-sdk", from: "10.14.0"),
+        .package(url: "https://github.com/airbnb/lottie-spm", from: "4.2.0"),
+        .package(url: "https://github.com/apple/swift-async-algorithms", from: "0.1.0"),
     ],
     targets: [
         .target(
@@ -29,9 +33,11 @@ var package = Package(
             dependencies: [
                 "Assets",
                 "Component",
-                "shared",
                 "Model",
-                "Theme",
+                .product(name: "LicenseList", package: "LicenseList")
+            ],
+            plugins: [
+                .plugin(name: "PrepareLicenseList", package: "LicenseList")
             ]
         ),
         .testTarget(
@@ -43,7 +49,9 @@ var package = Package(
 
         .target(
             name: "Assets",
-            resources: [
+            dependencies: [
+                .product(name: "Lottie", package: "lottie-spm"),
+            ], resources: [
                 .process("Resources"),
                 .process("swiftgen.yml"),
             ],
@@ -53,9 +61,23 @@ var package = Package(
         ),
 
         .target(
+            name: "Auth",
+            dependencies: [
+                "shared",
+                .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
+            ]
+        ),
+
+        .target(
             name: "Component",
             dependencies: [
                 "Theme",
+            ]
+        ),
+        .testTarget(
+            name: "ComponentTests",
+            dependencies: [
+                "Component",
             ]
         ),
 
@@ -64,9 +86,33 @@ var package = Package(
             dependencies: [
                 "Assets",
                 "Component",
-                "Model",
+                "KMPContainer",
                 "shared",
-                "Theme",
+                "Model",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+            ]
+        ),
+        .testTarget(
+            name: "ContributorTests",
+            dependencies: [
+                "Contributor",
+            ]
+        ),
+
+        .target(
+            name: "DeepLink",
+            dependencies: [
+                "KMPContainer",
+                "shared",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "FirebaseDynamicLinks", package: "firebase-ios-sdk"),
+            ]
+        ),
+
+        .target(
+            name: "Event",
+            dependencies: [
+                .product(name: "Dependencies", package: "swift-dependencies"),
             ]
         ),
 
@@ -74,8 +120,9 @@ var package = Package(
             name: "FloorMap",
             dependencies: [
                 "Assets",
-                "shared",
                 "Theme",
+                "Component",
+                "KMPContainer"
             ]
         ),
         .testTarget(
@@ -86,13 +133,29 @@ var package = Package(
         ),
 
         .target(
+            name: "KMPContainer",
+            dependencies: [
+                "Auth",
+                "shared",
+                "RemoteConfig",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+            ]
+        ),
+        .testTarget(
+            name: "KMPContainerTests",
+            dependencies: [
+                "KMPContainer",
+            ]
+        ),
+
+        .target(
             name: "Session",
             dependencies: [
                 "Assets",
                 "Component",
+                "Event",
+                "KMPContainer",
                 "Model",
-                "shared",
-                "Theme",
             ]
         ),
         .testTarget(
@@ -106,24 +169,54 @@ var package = Package(
             name: "Sponsor",
             dependencies: [
                 "Assets",
+                "Component",
+                "KMPContainer",
                 "Model",
                 "shared",
-                "Theme",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+            ]
+        ),
+        .testTarget(
+            name: "SponsorTests",
+            dependencies: [
+                "Sponsor"
             ]
         ),
 
         .target(
-            name: "Stamps",
+            name: "Staff",
             dependencies: [
                 "Assets",
+                "Component",
+                "KMPContainer",
+                "Model",
                 "shared",
-                "Theme",
+                .product(name: "Dependencies", package: "swift-dependencies"),
             ]
         ),
         .testTarget(
-            name: "StampsTests",
+            name: "StaffTests",
             dependencies: [
-                "Stamps"
+                "Staff"
+            ]
+        ),
+
+        .target(
+            name: "Achievements",
+            dependencies: [
+                "Assets",
+                "DeepLink",
+                "Theme",
+                "KMPContainer",
+                "NFC",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+            ]
+        ),
+        .testTarget(
+            name: "AchievementsTests",
+            dependencies: [
+                "Achievements"
             ]
         ),
 
@@ -132,9 +225,9 @@ var package = Package(
             dependencies: [
                 "Assets",
                 "Component",
-                "shared",
+                "KMPContainer",
                 "Model",
-                "Theme",
+                .product(name: "Dependencies", package: "swift-dependencies"),
             ]
         ),
         .testTarget(
@@ -148,14 +241,32 @@ var package = Package(
             name: "Navigation",
             dependencies: [
                 "About",
+                "Achievements",
                 "Assets",
                 "Contributor",
+                "DeepLink",
                 "FloorMap",
                 "Session",
                 "Sponsor",
-                "Stamps",
+                "Staff",
                 "Theme",
                 "Timetable",
+                .product(name: "FirebaseRemoteConfig", package: "firebase-ios-sdk"),
+            ]
+        ),
+
+        .target(
+            name: "NFC",
+            dependencies: [
+                "Model",
+            ]
+        ),
+
+        .target(
+            name: "RemoteConfig",
+            dependencies: [
+                "shared",
+                .product(name: "FirebaseRemoteConfig", package: "firebase-ios-sdk"),
             ]
         ),
 
@@ -163,6 +274,12 @@ var package = Package(
             name: "Model",
             dependencies: [
                 "shared",
+            ]
+        ),
+        .testTarget(
+            name: "ModelTests",
+            dependencies: [
+                "Model",
             ]
         ),
 
@@ -206,3 +323,27 @@ package.targets = package.targets.map { target in
 
     return target
 }
+
+#if canImport(Darwin)
+import Darwin
+
+// Disable plugins on Xcode Cloud CI
+package.targets = package.targets.map { target in
+    if let ciEnvPointer = getenv("CI") {
+        let ciEnv = String(cString: ciEnvPointer)
+        if ciEnv == "TRUE" {
+            if target.name == "About" {
+                target.resources = [
+                    .process("Resources")
+                ]
+            }
+
+            if target.type == .regular || target.type == .test {
+                target.plugins = []
+            }
+        }
+    }
+
+    return target
+}
+#endif

@@ -9,9 +9,7 @@ group = "io.github.droidkaigi.confsched2023.buildlogic"
 repositories {
     google()
     mavenCentral()
-    maven {
-        url = uri("https://plugins.gradle.org/m2/")
-    }
+    gradlePluginPortal()
 }
 
 // If we use jvmToolchain, we need to install JDK 11
@@ -51,6 +49,10 @@ gradlePlugin {
         register("androidHilt") {
             id = "droidkaigi.primitive.android.hilt"
             implementationClass = "io.github.droidkaigi.confsched2023.primitive.AndroidHiltPlugin"
+        }
+        register("androidCrashlytics") {
+            id = "droidkaigi.primitive.android.crashlytics"
+            implementationClass = "io.github.droidkaigi.confsched2023.primitive.AndroidCrashlyticsPlugin"
         }
         register("androidFirebase") {
             id = "droidkaigi.primitive.android.firebase"
@@ -92,13 +94,17 @@ gradlePlugin {
             id = "droidkaigi.primitive.kmp.serialization"
             implementationClass = "io.github.droidkaigi.confsched2023.primitive.KotlinSerializationPlugin"
         }
-        register("spotless") {
-            id = "droidkaigi.primitive.spotless"
-            implementationClass = "io.github.droidkaigi.confsched2023.primitive.SpotlessPlugin"
+        register("koverEntryPoint") {
+            id = "droidkaigi.primitive.kover.entrypoint"
+            implementationClass = "io.github.droidkaigi.confsched2023.primitive.KoverEntryPointPlugin"
         }
-        register("kover") {
-            id = "droidkaigi.primitive.kover"
-            implementationClass = "io.github.droidkaigi.confsched2023.primitive.KoverPlugin"
+        register("detekt") {
+            id = "droidkaigi.primitive.detekt"
+            implementationClass = "io.github.droidkaigi.confsched2023.primitive.DetektPlugin"
+        }
+        register("oss-licenses") {
+            id = "droidkaigi.primitive.android.osslicenses"
+            implementationClass = "io.github.droidkaigi.confsched2023.primitive.OssLicensesPlugin"
         }
 
         // Conventions

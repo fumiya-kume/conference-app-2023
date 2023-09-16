@@ -1,29 +1,41 @@
 import Model
+import shared
 import SwiftUI
+import Theme
 
 struct TimetableListView: View {
     let timetableTimeGroupItems: [TimetableTimeGroupItems]
+    let searchWord: String
+    let onToggleBookmark: (TimetableItemId) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             ForEach(timetableTimeGroupItems) { timetableTimeGroupItem in
-                HStack(alignment: .top, spacing: 16) {
-                    SessionTimeView(
-                        startsAt: timetableTimeGroupItem.startsAt,
-                        endsAt: timetableTimeGroupItem.endsAt
-                    )
-                    VStack(spacing: 0) {
-                        ForEach(timetableTimeGroupItem.items, id: \.timetableItem.id.value) { timetableItemWithFavorite in
-                            NavigationLink(value: TimetableRouting.session(timetableItemWithFavorite.timetableItem)) {
-                                TimetableListItemView(
-                                    timetableItemWithFavorite: timetableItemWithFavorite
-                                )
+                if timetableTimeGroupItem.items.isEmpty {
+                    EmptyView()
+                } else {
+                    HStack(alignment: .top, spacing: SpacingTokens.m) {
+                        SessionTimeView(
+                            startsTimeString: timetableTimeGroupItem.startsTimeString,
+                            endsTimeString: timetableTimeGroupItem.endsTimeString
+                        )
+                        VStack(spacing: 0) {
+                            ForEach(timetableTimeGroupItem.items, id: \.timetableItem.id.value) { timetableItemWithFavorite in
+                                NavigationLink(value: TimetableRouting.session(timetableItemWithFavorite.timetableItem)) {
+                                    TimetableListItemView(
+                                        timetableItemWithFavorite: timetableItemWithFavorite,
+                                        searchWord: searchWord,
+                                        onToggleBookmark: {
+                                            onToggleBookmark(timetableItemWithFavorite.timetableItem.id)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
+                    .padding(8)
+                    Divider()
                 }
-                .padding(8)
-                Divider()
             }
         }
         .padding(.vertical, 24)
@@ -31,20 +43,17 @@ struct TimetableListView: View {
 }
 
 #if DEBUG
-import shared
-
 #Preview {
     TimetableListView(
         timetableTimeGroupItems: [
             TimetableTimeGroupItems(
-                duration: .init(
-                    startsAt: Timetable.companion.fake().contents.first!.timetableItem.startsAt,
-                    endsAt: Timetable.companion.fake().contents.first!.timetableItem.endsAt
-                ),
+                startsTimeString: Timetable.companion.fake().contents.first!.timetableItem.startsTimeString,
+                endsTimeString: Timetable.companion.fake().contents.first!.timetableItem.endsTimeString,
                 items: [Timetable.companion.fake().contents.first!]
             ),
-        ]
+        ],
+        searchWord: "",
+        onToggleBookmark: {_ in}
     )
 }
-
 #endif

@@ -1,5 +1,7 @@
 package io.github.droidkaigi.confsched2023.data.di
 
+import android.app.Application
+import androidx.lifecycle.ProcessLifecycleOwner
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -10,16 +12,14 @@ import io.github.droidkaigi.confsched2023.data.auth.AndroidAuthenticator
 import io.github.droidkaigi.confsched2023.data.auth.AuthApi
 import io.github.droidkaigi.confsched2023.data.auth.Authenticator
 import io.github.droidkaigi.confsched2023.data.auth.DefaultAuthApi
+import io.github.droidkaigi.confsched2023.data.core.defaultJson
+import io.github.droidkaigi.confsched2023.data.core.defaultKtorConfig
+import io.github.droidkaigi.confsched2023.data.di.ServerEnvironmentModule.ServerEnvironment
 import io.github.droidkaigi.confsched2023.data.remoteconfig.DefaultRemoteConfigApi
 import io.github.droidkaigi.confsched2023.data.remoteconfig.RemoteConfigApi
 import io.github.droidkaigi.confsched2023.data.user.UserDataStore
 import io.ktor.client.HttpClient
-import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.defaultRequest
-import io.ktor.client.request.headers
-import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -66,37 +66,10 @@ public class ApiModule {
         return httpClient
     }
 
-    public fun HttpClientConfig<*>.defaultKtorConfig(
-        userDataStore: UserDataStore,
-        ktorJsonSettings: Json,
-    ) {
-        install(ContentNegotiation) {
-            json(
-                ktorJsonSettings,
-            )
-        }
-
-        defaultRequest {
-            headers {
-                userDataStore.idToken.value?.let {
-                    set("Authorization", "Bearer $it")
-                }
-            }
-        }
-    }
-
     @Provides
     @Singleton
     fun provideKtorJsonSettings(): Json {
-        return Json {
-            encodeDefaults = true
-            isLenient = true
-            allowSpecialFloatingPointValues = true
-            allowStructuredMapKeys = true
-            prettyPrint = false
-            useArrayPolymorphism = false
-            ignoreUnknownKeys = true
-        }
+        return defaultJson()
     }
 
     @Provides
@@ -120,11 +93,12 @@ public class KtorfitModule {
     @Singleton
     public fun provideKtorfit(
         httpClient: HttpClient,
+        serverEnvironment: ServerEnvironment,
     ): Ktorfit {
         return Ktorfit
             .Builder()
             .httpClient(httpClient)
-            .baseUrl("https://ssot-api-staging.an.r.appspot.com/")
+            .baseUrl(serverEnvironment.baseUrl)
             .build()
     }
 }
@@ -156,9 +130,28 @@ class AuthenticatorModule {
 @InstallIn(SingletonComponent::class)
 @Module
 class RemoteConfigModule {
+
     @Provides
     @Singleton
-    fun provideFirebaseRemoteConfig(): RemoteConfigApi {
-        return DefaultRemoteConfigApi()
+    fun provideRemoteConfigApi(): RemoteConfigApi {
+        return DefaultRemoteConfigApi(ProcessLifecycleOwner.get().lifecycle)
+    }
+}
+
+@InstallIn(SingletonComponent::class)
+@Module
+class ServerEnvironmentModule {
+    class ServerEnvironment(
+        val baseUrl: String,
+    )
+
+    interface HasServerEnvironment {
+        val serverEnvironment: ServerEnvironment
+    }
+
+    @Provides
+    @Singleton
+    fun provideServerEnvironment(application: Application): ServerEnvironment {
+        return (application as HasServerEnvironment).serverEnvironment
     }
 }

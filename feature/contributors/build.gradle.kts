@@ -14,10 +14,6 @@ kotlin {
                 implementation(projects.core.model)
                 implementation(projects.core.ui)
                 implementation(libs.kotlinxCoroutinesCore)
-            }
-        }
-        androidMain {
-            dependencies {
                 implementation(projects.core.designsystem)
             }
         }

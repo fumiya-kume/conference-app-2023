@@ -32,18 +32,18 @@ public struct InformationRow: View {
     public var body: some View {
         HStack {
             icon
-            HStack(spacing: 12) {
+            HStack(spacing: SpacingTokens.s) {
                 Text(title)
-                    .font(Font.system(size: 14, weight: .semibold))
+                    .textStyle(TypographyTokens.labelLarge)
                 HStack {
                     Text(content)
-                        .font(Font.system(size: 14, weight: .semibold))
+                        .textStyle(TypographyTokens.bodyMedium)
                     if let action = action {
                         Button {
                             action.action()
                         } label: {
                             Text(action.label)
-                                .font(Font.system(size: 14, weight: .semibold))
+                                .textStyle(TypographyTokens.bodyMedium)
                                 .underline()
                                 .foregroundStyle(
                                     AssetColors.Primary.primary.swiftUIColor

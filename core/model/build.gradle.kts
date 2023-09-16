@@ -2,15 +2,15 @@ plugins {
     id("droidkaigi.primitive.kmp")
     id("droidkaigi.primitive.kmp.android")
     id("droidkaigi.primitive.kmp.ios")
-    id("droidkaigi.primitive.spotless")
-    id("droidkaigi.primitive.kover")
+    id("droidkaigi.primitive.detekt")
 }
 
 android.namespace = "io.github.droidkaigi.confsched2023.core.model"
 
+@Suppress("UnusedPrivateProperty")
 kotlin {
     sourceSets {
-        commonMain{
+        commonMain {
             dependencies {
                 implementation(libs.kotlinxCoroutinesCore)
                 implementation(libs.kotlinSerializationJson)
@@ -19,7 +19,7 @@ kotlin {
             }
         }
         val androidMain by getting {
-            dependencies{
+            dependencies {
                 implementation(libs.composeRuntime)
                 implementation(libs.androidxAppCompat)
             }
@@ -28,4 +28,5 @@ kotlin {
 }
 
 dependencies {
+    implementation(platform(libs.composeBom))
 }

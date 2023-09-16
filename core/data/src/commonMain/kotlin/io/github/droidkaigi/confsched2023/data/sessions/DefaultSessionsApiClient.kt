@@ -12,6 +12,7 @@ import io.github.droidkaigi.confsched2023.model.RoomType.RoomA
 import io.github.droidkaigi.confsched2023.model.RoomType.RoomB
 import io.github.droidkaigi.confsched2023.model.RoomType.RoomC
 import io.github.droidkaigi.confsched2023.model.RoomType.RoomD
+import io.github.droidkaigi.confsched2023.model.RoomType.RoomDE
 import io.github.droidkaigi.confsched2023.model.RoomType.RoomE
 import io.github.droidkaigi.confsched2023.model.Timetable
 import io.github.droidkaigi.confsched2023.model.TimetableAsset
@@ -51,7 +52,7 @@ class DefaultSessionsApiClient internal constructor(
     }
 }
 
-internal fun SessionsAllResponse.toTimetable(): Timetable {
+fun SessionsAllResponse.toTimetable(): Timetable {
     val timetableContents = this
     val speakerIdToSpeaker: Map<String, TimetableSpeaker> = timetableContents.speakers
         .groupBy { it.id }
@@ -81,13 +82,11 @@ internal fun SessionsAllResponse.toTimetable(): Timetable {
         .associateBy(
             keySelector = { room -> room.id },
             valueTransform = { room ->
-                val roomSorts = timetableContents.rooms.map { it.sort }.sorted()
                 TimetableRoom(
                     id = room.id,
                     name = room.name.toMultiLangText(),
-                    sort = room.sort,
-                    sortIndex = roomSorts.indexOf(room.sort),
                     type = room.name.toRoomType(),
+                    sort = room.sort,
                 )
             },
         )
@@ -110,7 +109,17 @@ internal fun SessionsAllResponse.toTimetable(): Timetable {
                             isInterpretationTarget = apiSession.interpretationTarget,
                         ),
                         asset = apiSession.asset.toTimetableAsset(),
-                        description = apiSession.description ?: "",
+                        description = if (
+                            apiSession.i18nDesc?.ja == null &&
+                            apiSession.i18nDesc?.en == null
+                        ) {
+                            MultiLangText(
+                                jaTitle = apiSession.description ?: "",
+                                enTitle = apiSession.description ?: "",
+                            )
+                        } else {
+                            apiSession.i18nDesc.toMultiLangText()
+                        },
                         speakers = apiSession.speakers
                             .map { speakerIdToSpeaker[it]!! }
                             .toPersistentList(),
@@ -136,28 +145,42 @@ internal fun SessionsAllResponse.toTimetable(): Timetable {
                             .map { speakerIdToSpeaker[it]!! }
                             .toPersistentList(),
                         levels = apiSession.levels.toPersistentList(),
+                        description = if (
+                            apiSession.i18nDesc?.ja == null &&
+                            apiSession.i18nDesc?.en == null
+                        ) {
+                            MultiLangText(
+                                jaTitle = apiSession.description ?: "",
+                                enTitle = apiSession.description ?: "",
+                            )
+                        } else {
+                            apiSession.i18nDesc.toMultiLangText()
+                        },
                     )
                 }
             }
                 .sortedWith(
                     compareBy<TimetableItem> { it.startsAt }
-                        .thenBy { it.room.sort },
+                        .thenBy { it.room },
                 )
                 .toPersistentList(),
         ),
     )
 }
 
-private fun LocaledResponse.toMultiLangText() = MultiLangText(jaTitle = ja, enTitle = en)
+private fun LocaledResponse.toMultiLangText() =
+    MultiLangText(jaTitle = ja ?: "", enTitle = en ?: "")
+
 private fun SessionMessageResponse.toMultiLangText() = MultiLangText(jaTitle = ja, enTitle = en)
 private fun SessionAssetResponse.toTimetableAsset() = TimetableAsset(videoUrl, slideUrl)
-private fun LocaledResponse.toRoomType() = when (en.lowercase()) {
+private fun LocaledResponse.toRoomType() = when (en?.lowercase()) {
     "arctic fox" -> RoomA
     "bumblebee" -> RoomB
     "chipmunk" -> RoomC
     "dolphin" -> RoomD
     "electric eel" -> RoomE
-    else -> RoomA
+    // Assume the room on the third day.
+    else -> RoomDE
 }
 
 internal fun String.toInstantAsJST(): Instant {

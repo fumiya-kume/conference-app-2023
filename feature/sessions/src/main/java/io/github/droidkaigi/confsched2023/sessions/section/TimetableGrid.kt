@@ -9,7 +9,10 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,7 +25,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
@@ -57,13 +60,23 @@ import io.github.droidkaigi.confsched2023.model.DroidKaigi2023Day
 import io.github.droidkaigi.confsched2023.model.Timetable
 import io.github.droidkaigi.confsched2023.model.TimetableItem
 import io.github.droidkaigi.confsched2023.model.TimetableRoom
+import io.github.droidkaigi.confsched2023.model.TimetableRooms
 import io.github.droidkaigi.confsched2023.model.fake
+import io.github.droidkaigi.confsched2023.sessions.component.HoursItem
+import io.github.droidkaigi.confsched2023.sessions.component.RoomItem
+import io.github.droidkaigi.confsched2023.sessions.component.TimetableGridHours
 import io.github.droidkaigi.confsched2023.sessions.component.TimetableGridItem
+import io.github.droidkaigi.confsched2023.sessions.component.TimetableGridRooms
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
 
 data class TimetableGridUiState(val timetable: Timetable)
@@ -74,20 +87,68 @@ fun TimetableGrid(
     nestedScrollDispatcher: NestedScrollDispatcher,
     onTimetableItemClick: (TimetableItem) -> Unit,
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(),
 ) {
-    val timetableGridState = rememberTimetableGridState()
     TimetableGrid(
         timetable = uiState.timetable,
-        timetableState = timetableGridState,
         nestedScrollDispatcher = nestedScrollDispatcher,
+        onTimetableItemClick = onTimetableItemClick,
         modifier = modifier,
-        contentPadding = PaddingValues(16.dp),
-    ) { timetableItem, itemHeightPx ->
-        TimetableGridItem(
-            timetableItem = timetableItem,
-            onTimetableItemClick = onTimetableItemClick,
-            gridItemHeightPx = itemHeightPx,
-        )
+        contentPadding = contentPadding,
+    )
+}
+
+@Composable
+fun TimetableGrid(
+    timetable: Timetable,
+    nestedScrollDispatcher: NestedScrollDispatcher,
+    onTimetableItemClick: (TimetableItem) -> Unit,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(),
+) {
+    val timetableGridState = rememberTimetableGridState()
+    val coroutineScope = rememberCoroutineScope()
+    val layoutDirection = LocalLayoutDirection.current
+    Row(
+        modifier = Modifier.padding(
+            top = contentPadding.calculateTopPadding(),
+            start = contentPadding.calculateStartPadding(layoutDirection),
+            end = contentPadding.calculateEndPadding(layoutDirection),
+        ),
+    ) {
+        TimetableGridHours(
+            timetableState = timetableGridState,
+            coroutineScope = coroutineScope,
+        ) { hour ->
+            HoursItem(hour = hour)
+        }
+        Column {
+            TimetableGridRooms(
+                timetableRooms = TimetableRooms(timetable.rooms),
+                timetableState = timetableGridState,
+                coroutineScope = coroutineScope,
+            ) { room ->
+                RoomItem(room = room)
+            }
+            TimetableGrid(
+                timetable = timetable,
+                timetableState = timetableGridState,
+                nestedScrollDispatcher = nestedScrollDispatcher,
+                modifier = modifier,
+                contentPadding = PaddingValues(
+                    top = 16.dp + contentPadding.calculateTopPadding(),
+                    bottom = 16.dp + 80.dp + contentPadding.calculateBottomPadding(),
+                    start = 16.dp + contentPadding.calculateStartPadding(layoutDirection),
+                    end = 16.dp + contentPadding.calculateEndPadding(layoutDirection),
+                ),
+            ) { timetableItem, itemHeightPx ->
+                TimetableGridItem(
+                    timetableItem = timetableItem,
+                    onTimetableItemClick = onTimetableItemClick,
+                    gridItemHeightPx = itemHeightPx,
+                )
+            }
+        }
     }
 }
 
@@ -118,7 +179,6 @@ fun TimetableGrid(
     val visibleItemLayouts by remember(timetableScreen) { timetableScreen.visibleItemLayouts }
     val lineColor = MaterialTheme.colorScheme.surfaceVariant
     val linePxSize = with(timetableState.density) { TimetableSizes.lineStrokeSize.toPx() }
-    val layoutDirection = LocalLayoutDirection.current
 
     val itemProvider = itemProvider({ timetable.timetableItems.size }) { index ->
         val timetableItemWithFavorite = timetable.contents[index]
@@ -128,11 +188,6 @@ fun TimetableGrid(
 
     LazyLayout(
         modifier = modifier
-            .padding(
-                top = contentPadding.calculateTopPadding(),
-                start = contentPadding.calculateStartPadding(layoutDirection),
-                end = contentPadding.calculateEndPadding(layoutDirection),
-            )
             .focusGroup()
             .clipToBounds()
             .drawBehind {
@@ -153,6 +208,23 @@ fun TimetableGrid(
                     )
                 }
             }
+            .transformable(
+                state = rememberTransformableState { zoomChange, panChange, _ ->
+
+                    timetableState.screenScaleState.updateVerticalScale(
+                        timetableState.screenScaleState.verticalScale * zoomChange,
+                    )
+
+                    coroutineScope.launch {
+                        timetableScreen.scroll(
+                            panChange,
+                            0,
+                            Offset.Zero,
+                            nestedScrollDispatcher,
+                        )
+                    }
+                },
+            )
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDrag = { change, dragAmount ->
@@ -178,10 +250,6 @@ fun TimetableGrid(
                     },
                 )
             }
-            // FIXME: This disables timetable scroll
-//            .transformable(
-//                rememberTransformableStateForScreenScale(timetableState.screenScaleState),
-//            )
             .semantics {
                 horizontalScrollAxisRange = ScrollAxisRange(
                     value = { -scrollState.scrollX },
@@ -252,19 +320,12 @@ fun TimetableGrid(
 @MultiLanguagePreviews
 @Composable
 fun TimetablePreview() {
-    val timetableState = rememberTimetableGridState()
     TimetableGrid(
-        modifier = Modifier.fillMaxSize(),
         timetable = Timetable.fake(),
-        timetableState = timetableState,
         nestedScrollDispatcher = remember { NestedScrollDispatcher() },
-    ) { timetableItem, itemHeightPx ->
-        TimetableGridItem(
-            timetableItem = timetableItem,
-            onTimetableItemClick = {},
-            gridItemHeightPx = itemHeightPx,
-        )
-    }
+        onTimetableItemClick = {},
+        modifier = Modifier.fillMaxSize(),
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -273,12 +334,12 @@ private fun itemProvider(
     itemContent: @Composable (Int) -> Unit,
 ): LazyLayoutItemProvider {
     return object : LazyLayoutItemProvider {
+        override val itemCount: Int get() = itemCount()
+
         @Composable
         override fun Item(index: Int, key: Any) {
             itemContent(index)
         }
-
-        override val itemCount: Int get() = itemCount()
     }
 }
 
@@ -288,9 +349,18 @@ private data class TimetableItemLayout(
     val dayStartTime: Instant,
     val density: Density,
     val minutePx: Float,
-    val dayToStartTime: MutableMap<DroidKaigi2023Day, Instant>,
+    val dayToStartTime: Map<DroidKaigi2023Day, Instant>,
 ) {
-    val dayStart = dayToStartTime[timetableItem.day] ?: dayStartTime
+    val dayStart = run {
+        val tz = TimeZone.of("Asia/Tokyo")
+        val startTime = dayToStartTime[timetableItem.day] ?: dayStartTime
+        val localDate = startTime.toLocalDateTime(tz).date
+        val dayStartLocalTime = LocalDateTime(
+            date = localDate,
+            time = LocalTime(10, 0),
+        )
+        dayStartLocalTime.toInstant(tz)
+    }
     private val displayEndsAt = timetableItem.endsAt.minus(1, DateTimeUnit.MINUTE)
     val height =
         ((displayEndsAt - timetableItem.startsAt).inWholeMinutes * minutePx).roundToInt()
@@ -339,7 +409,14 @@ private data class TimetableLayout(
                 )
             }
         }
-        dayToStartTime
+        dayToStartTime.mapValues { (_, startTime) ->
+            val tz = TimeZone.of("UTC+9")
+            val dayStartLocalTime = startTime.toLocalDateTime(tz)
+            LocalDateTime(
+                date = dayStartLocalTime.date,
+                time = LocalTime(dayStartLocalTime.hour, 0),
+            ).toInstant(tz)
+        }
     }
     val timetableLayouts = timetable.timetableItems.map {
         val timetableItemLayout = TimetableItemLayout(
@@ -449,6 +526,26 @@ class ScreenScrollState(
         }
     }
 
+    suspend fun flingYIfPossible() = coroutineScope {
+        val velocity = velocityTracker.calculateVelocity()
+        launch {
+            _scrollY.animateDecay(
+                velocity.y / 2f,
+                exponentialDecay(),
+            )
+        }
+    }
+
+    suspend fun flingXIfPossible() = coroutineScope {
+        val velocity = velocityTracker.calculateVelocity()
+        launch {
+            _scrollX.animateDecay(
+                velocity.x / 2f,
+                exponentialDecay(),
+            )
+        }
+    }
+
     fun updateBounds(maxX: Float, maxY: Float) {
         _scrollX.updateBounds(maxX, 0f)
         _scrollY.updateBounds(maxY, 0f)
@@ -483,12 +580,6 @@ fun rememberScreenScaleState(): ScreenScaleState = rememberSaveable(
     ScreenScaleState()
 }
 
-@Composable
-fun rememberTransformableStateForScreenScale(screenScaleState: ScreenScaleState) =
-    rememberTransformableState { zoomChange, _, _ ->
-        screenScaleState.updateVerticalScale(screenScaleState.verticalScale * zoomChange)
-    }
-
 @Stable
 class ScreenScaleState(
     initialVerticalScale: Float = 1f,
@@ -496,7 +587,7 @@ class ScreenScaleState(
 ) {
     private var verticalScaleLowerBound = initialVerticalScaleLowerBound
     private val verticalScaleUpperBound = 1f
-    private val verticalScaleState = mutableStateOf(
+    private val verticalScaleState = mutableFloatStateOf(
         initialVerticalScale.coerceIn(verticalScaleLowerBound, verticalScaleUpperBound),
     )
 
@@ -689,6 +780,5 @@ internal suspend fun PointerInputScope.detectDragGestures(
 object TimetableSizes {
     val columnWidth = 192.dp
     val lineStrokeSize = 1.dp
-    val currentTimeCircleRadius = 6.dp
     val minuteHeight = 4.dp
 }

@@ -1,3 +1,6 @@
+// TODO: Remove when you start using `displayFeatures`
+@file:Suppress("UnusedParameter")
+
 package io.github.droidkaigi.confsched2023.main
 
 import androidx.annotation.DrawableRes
@@ -12,15 +15,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material3.Scaffold
@@ -33,7 +32,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
@@ -138,11 +136,11 @@ enum class MainScreenTab(
         label = MainStrings.FloorMap.asString(),
         contentDescription = MainStrings.FloorMap.asString(),
     ),
-    Badges(
-        icon = IconRepresentation.Drawable(drawableId = R.drawable.icon_stamp_outline),
-        selectedIcon = IconRepresentation.Drawable(drawableId = R.drawable.icon_stamp_fill),
-        label = MainStrings.Stamps.asString(),
-        contentDescription = MainStrings.Stamps.asString(),
+    Achievements(
+        icon = IconRepresentation.Drawable(drawableId = R.drawable.icon_achievement_outline),
+        selectedIcon = IconRepresentation.Drawable(drawableId = R.drawable.icon_achievement_fill),
+        label = MainStrings.Achievements.asString(),
+        contentDescription = MainStrings.Achievements.asString(),
     ),
     About(
         icon = IconRepresentation.Vector(Icons.Outlined.Info),
@@ -150,16 +148,10 @@ enum class MainScreenTab(
         label = MainStrings.About.asString(),
         contentDescription = MainStrings.About.asString(),
     ),
-    Contributor(
-        icon = IconRepresentation.Vector(Icons.Outlined.Group),
-        selectedIcon = IconRepresentation.Vector(Icons.Filled.Group),
-        label = MainStrings.Contributors.asString(),
-        contentDescription = MainStrings.Contributors.asString(),
-    ),
 }
 
 data class MainScreenUiState(
-    val isStampsEnabled: Boolean = false,
+    val isAchievementsEnabled: Boolean = false,
 )
 
 @Composable
@@ -182,7 +174,7 @@ private fun MainScreen(
                     onTabSelected(mainNestedNavController, tab)
                 },
                 currentTab = currentTab ?: MainScreenTab.Timetable,
-                isEnableStamps = uiState.isStampsEnabled,
+                isEnableAchievements = uiState.isAchievementsEnabled,
             )
         }
         Scaffold(
@@ -194,16 +186,15 @@ private fun MainScreen(
                             onTabSelected(mainNestedNavController, tab)
                         },
                         currentTab = currentTab ?: MainScreenTab.Timetable,
-                        isEnableStamps = uiState.isStampsEnabled,
+                        isEnableAchievements = uiState.isAchievementsEnabled,
                     )
                 }
             },
-            contentWindowInsets = WindowInsets(0.dp),
         ) { padding ->
             NavHost(
                 navController = mainNestedNavController,
                 startDestination = "timetable",
-                modifier = Modifier.padding(padding),
+                modifier = Modifier,
                 enterTransition = { materialFadeThroughIn() },
                 exitTransition = { materialFadeThroughOut() },
             ) {

@@ -12,11 +12,11 @@ struct SponsorGridView: View {
     var action: (Sponsor) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: SpacingTokens.m) {
             Text(title)
-                .font(.system(size: 22, weight: .semibold, design: .default))
+                .textStyle(TypographyTokens.titleMedium)
                 .foregroundStyle(AssetColors.Surface.onSurface.swiftUIColor)
-            LazyVGrid(columns: Array(repeating: GridItem(spacing: 16), count: columns), spacing: 16) {
+            LazyVGrid(columns: Array(repeating: GridItem(spacing: SpacingTokens.m), count: columns), spacing: SpacingTokens.m) {
                 ForEach(sponsors) { sponsor in
                     SponsorItemView(sponsor: sponsor) {
                         action(sponsor)
@@ -41,6 +41,7 @@ struct SponsorItemView: View {
                 CacheAsyncImage(url: URL(string: sponsor.logo)) { image in
                     image
                         .resizable()
+                        .scaledToFit()
                         .frame(minWidth: 0, maxWidth: .infinity)
                         .frame(minHeight: 0, maxHeight: .infinity)
                 } placeholder: {
@@ -49,7 +50,7 @@ struct SponsorItemView: View {
             }
         }
         .frame(height: sponsor.plan.itemHeight)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: RadiusTokens.xs, style: .continuous))
     }
 }
 

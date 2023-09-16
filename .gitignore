@@ -22,7 +22,7 @@ local.properties
 .project
 
 # Windows thumbnail db
-.DS_Store
+Thumbs.db
 
 # IDEA/Android Studio project files, because
 # the project can be imported from settings.gradle.kts
@@ -36,6 +36,10 @@ local.properties
 !/.idea/codeStyles/Project.xml
 !/.idea/codeStyles/codeStyleConfig.xml
 !/.idea/icon*.svg
+# Suppress typo
+!/.idea/dictionaries
+/.idea/dictionaries/*
+!/.idea/dictionaries/dictionary.xml
 
 # Gradle cache
 .gradle
@@ -59,3 +63,8 @@ DerivedData
 app-ios/fastlane/test_output
 app-ios/fastlane/README.md
 app-ios/fastlane/report.xml
+
+# Android Key
+app-android/src/prod/google-services.json
+keystore.properties
+droidkaigi2023.keystore

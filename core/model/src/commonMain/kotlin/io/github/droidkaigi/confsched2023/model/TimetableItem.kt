@@ -41,7 +41,7 @@ public sealed class TimetableItem {
         override val asset: TimetableAsset,
         override val levels: PersistentList<String>,
         override val speakers: PersistentList<TimetableSpeaker>,
-        val description: String,
+        val description: MultiLangText,
         val message: MultiLangText?,
     ) : TimetableItem() {
         public companion object
@@ -61,6 +61,7 @@ public sealed class TimetableItem {
         override val asset: TimetableAsset,
         override val levels: PersistentList<String>,
         override val speakers: PersistentList<TimetableSpeaker>,
+        val description: MultiLangText,
     ) : TimetableItem()
 
     private val startsDateString: String by lazy {
@@ -81,15 +82,21 @@ public sealed class TimetableItem {
     private val minutesString: String by lazy {
         val minutes = (endsAt - startsAt)
             .toComponents { minutes, _, _ -> minutes }
-        "${minutes}min"
+        "$minutes" + MultiLangText(jaTitle = "分", enTitle = "min").currentLangTitle
+    }
+
+    public val formattedTimeString: String by lazy {
+        "$startsTimeString ~ $endsTimeString"
     }
 
     public val formattedDateTimeString: String by lazy {
-        "$startsDateString / $startsTimeString ~ $endsTimeString ($minutesString)"
+        "$startsDateString / $formattedTimeString ($minutesString)"
     }
 
-    public val speakerString: String by lazy {
-        speakers.joinToString(", ") { it.name }
+    public val url: String get() = if (defaultLang() == Lang.JAPANESE) {
+        "https://2023.droidkaigi.jp/timetable/${id.value}"
+    } else {
+        "https://2023.droidkaigi.jp/en/timetable/${id.value}"
     }
 
     fun getSupportedLangString(isJapaneseLocale: Boolean): String {
@@ -127,9 +134,8 @@ public fun Session.Companion.fake(): Session {
         room = TimetableRoom(
             id = 1,
             name = MultiLangText("Room1", "Room2"),
-            sort = 1,
-            sortIndex = 0,
             type = RoomA,
+            sort = 1,
         ),
         targetAudience = "For App developer アプリ開発者向け",
         language = TimetableLanguage(
@@ -156,7 +162,10 @@ public fun Session.Companion.fake(): Session {
                 tagLine = "iOS Engineer",
             ),
         ).toPersistentList(),
-        description = "これはディスクリプションです。\nこれはディスクリプションです。\nhttps://github.com/DroidKaigi/conference-app-2023 これはURLです。\nこれはディスクリプションです。",
+        description = MultiLangText(
+            jaTitle = "これはディスクリプションです。\nこれはディスクリプションです。\nhttps://github.com/DroidKaigi/conference-app-2023 これはURLです。\nこれはディスクリプションです。",
+            enTitle = "This is a description.\nThis is a description.\nhttps://github.com/DroidKaigi/conference-app-2023 This is a URL.\nThis is a description.",
+        ),
         message = MultiLangText(
             jaTitle = "このセッションは事情により中止となりました",
             enTitle = "This session has been cancelled due to circumstances.",

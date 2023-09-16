@@ -1,7 +1,17 @@
 {
   "images" : [
     {
-      "filename" : "bookmarks.pdf",
+      "filename" : "trailing-icon 2.pdf",
+      "idiom" : "universal"
+    },
+    {
+      "appearances" : [
+        {
+          "appearance" : "luminosity",
+          "value" : "dark"
+        }
+      ],
+      "filename" : "bookmarks-icon-dark.pdf",
       "idiom" : "universal"
     }
   ],

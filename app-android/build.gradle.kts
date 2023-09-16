@@ -7,9 +7,11 @@ plugins {
     id("droidkaigi.primitive.android.compose")
     id("droidkaigi.primitive.android.hilt")
     id("droidkaigi.primitive.android.firebase")
-    id("droidkaigi.primitive.spotless")
+    id("droidkaigi.primitive.android.crashlytics")
+    id("droidkaigi.primitive.detekt")
     id("droidkaigi.primitive.android.roborazzi")
-    id("droidkaigi.primitive.kover")
+    id("droidkaigi.primitive.kover.entrypoint")
+    id("droidkaigi.primitive.android.osslicenses")
 }
 
 val keystorePropertiesFile = file("keystore.properties")
@@ -19,9 +21,12 @@ android {
     namespace = "io.github.droidkaigi.confsched2023"
 
     flavorDimensions += "network"
+    buildFeatures {
+        buildConfig = true
+    }
     defaultConfig {
-        versionCode = 1
-        versionName = "0.0.1"
+        versionCode = 11
+        versionName = "1.6.0"
     }
     signingConfigs {
         create("dev") {
@@ -48,6 +53,11 @@ android {
             isDefault = true
             applicationIdSuffix = ".dev"
             dimension = "network"
+            buildConfigField(
+                type = "String",
+                name = "SERVER_URL",
+                value = "\"https://ssot-api-staging.an.r.appspot.com/\"",
+            )
         }
         create("prod") {
             dimension = "network"
@@ -56,6 +66,11 @@ android {
             } else {
                 signingConfigs.getByName("dev")
             }
+            buildConfigField(
+                type = "String",
+                name = "SERVER_URL",
+                value = "\"https://ssot-api.droidkaigi.jp/\"",
+            )
         }
     }
     buildTypes {
@@ -63,7 +78,7 @@ android {
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
         debug {
@@ -86,16 +101,19 @@ dependencies {
     implementation(projects.feature.about)
     implementation(projects.feature.sponsors)
     implementation(projects.feature.floorMap)
-    implementation(projects.feature.stamps)
+    implementation(projects.feature.achievements)
     implementation(projects.feature.staff)
     implementation(projects.core.model)
     implementation(projects.core.data)
     implementation(projects.core.designsystem)
+    implementation(projects.core.ui)
     implementation(libs.composeNavigation)
     implementation(libs.composeHiltNavigtation)
     implementation(libs.composeMaterialWindowSize)
-    implementation(libs.accompanistSystemUiController)
     implementation(libs.androidxBrowser)
     implementation(libs.androidxWindow)
+    implementation(libs.kermit)
+    implementation(libs.androidxSplashScreen)
+    implementation(libs.firebaseDynamicLinks)
     testImplementation(projects.core.testing)
 }
