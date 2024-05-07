@@ -94,7 +94,7 @@ composeMaterialWindowSize = { module = "androidx.compose.material3:material3-win
 composeMaterialIcon = { module = "androidx.compose.material:material-icons-extended" }
 composeUiTestManifest = { module = "androidx.compose.ui:ui-test-manifest" }
 composeUiTestJunit4 = { module = "androidx.compose.ui:ui-test-junit4" }
-composeNavigation = { module = "androidx.navigation:navigation-compose", version = "2.7.2" }
+composeNavigation = { module = "androidx.navigation:navigation-compose", version = "2.7.7" }
 composeHiltNavigtation = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "composeHiltNavigatiaon" }
 composeLintCheck = { module = "com.slack.lint.compose:compose-lint-checks", version = "1.2.0" }
 composeCoil = { module = "io.coil-kt:coil-compose", version = "2.4.0" }
